@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOG Management Cockpit</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;500;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --bg2: #111318;
+    --bg3: #181c23;
+    --border: #252a35;
+    --border2: #2e3545;
+    --amber: #f5a623;
+    --amber-dim: #a87017;
+    --green: #2ecc71;
+    --green-dim: #1a7a43;
+    --red: #e74c3c;
+    --red-dim: #8b2d23;
+    --blue: #3498db;
+    --purple: #9b59b6;
+    --text: #c8d0e0;
+    --text-dim: #606880;
+    --text-bright: #eaf0ff;
+    --mono: 'Space Mono', monospace;
+    --display: 'Barlow Condensed', sans-serif;
+    --body: 'Barlow', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events:none; z-index:9999;
+  }
+
+  /* HEADER */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px;
+    height:56px;
+    background: var(--bg2);
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:100;
+  }
+
+  .logo {
+    display:flex; align-items:center; gap:12px;
+  }
+  .logo-mark {
+    width:32px; height:32px;
+    background: var(--amber);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .logo-text {
+    font-family: var(--display);
+    font-weight:900;
+    font-size:18px;
+    letter-spacing:0.12em;
+    color: var(--text-bright);
+    text-transform:uppercase;
+  }
+  .logo-sub {
+    font-family: var(--mono);
+    font-size:9px;
+    color: var(--text-dim);
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    margin-top:1px;
+  }
+
+  .header-right {
+    display:flex; align-items:center; gap:16px;
+  }
+  .live-badge {
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--mono); font-size:10px;
+    color:var(--green); letter-spacing:0.1em;
+  }
+  .live-dot {
+    width:7px; height:7px; border-radius:50%;
+    background:var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1;} 50%{opacity:0.3;}
+  }
+  .header-time {
+    font-family:var(--mono); font-size:11px;
+    color:var(--text-dim);
+  }
+  .weather-pill {
+    display:flex; align-items:center; gap:6px;
+    background:var(--bg3); border:1px solid var(--border);
+    padding:4px 10px; border-radius:20px;
+    font-size:12px; color:var(--text);
+  }
+
+  /* NAV */
+  nav {
+    display:flex; align-items:center;
+    background:var(--bg2);
+    border-bottom:1px solid var(--border);
+    padding:0 24px;
+    overflow-x:auto;
+    gap:2px;
+    position:sticky; top:56px; z-index:99;
+  }
+  .nav-btn {
+    display:flex; align-items:center; gap:7px;
+    padding:10px 16px;
+    font-family:var(--display);
+    font-size:13px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--text-dim);
+    background:none; border:none; cursor:pointer;
+    border-bottom:2px solid transparent;
+    white-space:nowrap;
+    transition:all 0.15s;
+  }
+  .nav-btn:hover { color:var(--text); }
+  .nav-btn.active {
+    color:var(--amber);
+    border-bottom-color:var(--amber);
+  }
+  .nav-icon { font-size:14px; }
+
+  /* MAIN */
+  main { padding:20px 24px; max-width:1600px; }
+
+  /* PAGES */
+  .page { display:none; animation: fadeIn 0.2s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+
+  /* PAGE HEADER */
+  .page-header {
+    display:flex; align-items:flex-end; justify-content:space-between;
+    margin-bottom:20px;
+  }
+  .page-title {
+    font-family:var(--display);
+    font-size:28px; font-weight:900;
+    letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--text-bright);
+    line-height:1;
+  }
+  .page-subtitle {
+    font-family:var(--mono); font-size:10px;
+    color:var(--text-dim); letter-spacing:0.1em;
+    margin-top:4px;
+  }
+
+  /* CONTROLS ROW */
+  .controls-row {
+    display:flex; flex-wrap:wrap; gap:8px;
+    margin-bottom:20px;
+  }
+  .ctrl-group {
+    display:flex; gap:2px;
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:6px; padding:2px;
+  }
+  .ctrl-btn {
+    padding:5px 12px;
+    font-family:var(--mono); font-size:10px;
+    color:var(--text-dim); background:none;
+    border:none; border-radius:4px; cursor:pointer;
+    letter-spacing:0.05em;
+    transition:all 0.15s;
+  }
+  .ctrl-btn:hover { color:var(--text); }
+  .ctrl-btn.active {
+    background:var(--amber);
+    color:#000; font-weight:700;
+  }
+  .ctrl-select {
+    background:var(--bg3); border:1px solid var(--border);
+    color:var(--text); padding:5px 10px;
+    font-family:var(--mono); font-size:10px;
+    border-radius:6px; cursor:pointer;
+    letter-spacing:0.05em;
+  }
+  .ctrl-select:focus { outline:none; border-color:var(--amber); }
+
+  /* GRID LAYOUTS */
+  .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  .grid-1-2 { display:grid; grid-template-columns:1fr 2fr; gap:12px; }
+  .grid-2-1 { display:grid; grid-template-columns:2fr 1fr; gap:12px; }
+  .grid-1-1-2 { display:grid; grid-template-columns:1fr 1fr 2fr; gap:12px; }
+
+  /* CARD */
+  .card {
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .card::before {
+    content:'';
+    position:absolute; top:0; left:0; right:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, rgba(245,166,35,0.3), transparent);
+  }
+  .card-title {
+    font-family:var(--display);
+    font-size:11px; font-weight:700;
+    letter-spacing:0.15em; text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:12px;
+  }
+
+  /* KPI CARD */
+  .kpi-card {
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:14px 16px;
+    position:relative;
+  }
+  .kpi-label {
+    font-family:var(--display);
+    font-size:10px; font-weight:700;
+    letter-spacing:0.15em; text-transform:uppercase;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .kpi-value {
+    font-family:var(--mono);
+    font-size:26px; font-weight:700;
+    color:var(--text-bright);
+    line-height:1;
+  }
+  .kpi-value.big { font-size:32px; }
+  .kpi-value.amber { color:var(--amber); }
+  .kpi-value.green { color:var(--green); }
+  .kpi-value.red { color:var(--red); }
+  .kpi-unit {
+    font-family:var(--mono); font-size:12px;
+    color:var(--text-dim); margin-left:3px;
+  }
+  .kpi-delta {
+    display:inline-flex; align-items:center; gap:4px;
+    font-family:var(--mono); font-size:10px;
+    padding:2px 7px; border-radius:3px;
+    margin-top:6px;
+  }
+  .kpi-delta.up { background:rgba(46,204,113,0.12); color:var(--green); }
+  .kpi-delta.down { background:rgba(231,76,60,0.12); color:var(--red); }
+  .kpi-delta.flat { background:rgba(245,166,35,0.12); color:var(--amber); }
+
+  /* TRAFFIC LIGHT */
+  .traffic-light {
+    position:absolute; top:12px; right:12px;
+    width:10px; height:10px; border-radius:50%;
+  }
+  .tl-green { background:var(--green); box-shadow:0 0 8px var(--green); }
+  .tl-amber { background:var(--amber); box-shadow:0 0 8px var(--amber); animation:pulse 2s infinite; }
+  .tl-red { background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1.5s infinite; }
+
+  /* CHART CONTAINER */
+  .chart-wrap { position:relative; width:100%; }
+  .chart-wrap canvas { max-height:220px; }
+  .chart-wrap.tall canvas { max-height:300px; }
+  .chart-wrap.short canvas { max-height:160px; }
+
+  /* TABLE */
+  .data-table { width:100%; border-collapse:collapse; }
+  .data-table th {
+    font-family:var(--display); font-size:10px; font-weight:700;
+    letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-dim); padding:6px 10px;
+    border-bottom:1px solid var(--border);
+    text-align:left;
+  }
+  .data-table td {
+    font-family:var(--mono); font-size:11px;
+    color:var(--text); padding:7px 10px;
+    border-bottom:1px solid var(--border);
+  }
+  .data-table tr:last-child td { border-bottom:none; }
+  .data-table tr:hover td { background:rgba(245,166,35,0.04); }
+  .td-green { color:var(--green); }
+  .td-red { color:var(--red); }
+  .td-amber { color:var(--amber); }
+  .td-dim { color:var(--text-dim); }
+
+  /* SECTION DIVIDER */
+  .section-gap { margin-top:16px; }
+  .section-label {
+    font-family:var(--display);
+    font-size:12px; font-weight:700;
+    letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--amber);
+    margin-bottom:10px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-label::after {
+    content:''; flex:1; height:1px;
+    background:linear-gradient(90deg, var(--amber-dim), transparent);
+  }
+
+  /* LOCATION TABS */
+  .loc-tabs {
+    display:flex; gap:4px; margin-bottom:12px;
+  }
+  .loc-tab {
+    padding:5px 14px;
+    font-family:var(--display); font-size:11px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase;
+    border:1px solid var(--border); border-radius:4px;
+    background:none; color:var(--text-dim); cursor:pointer;
+    transition:all 0.15s;
+  }
+  .loc-tab:hover { border-color:var(--amber); color:var(--amber); }
+  .loc-tab.active { background:var(--amber); border-color:var(--amber); color:#000; }
+
+  /* WEATHER WIDGET */
+  .weather-widget {
+    display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr;
+    gap:8px;
+  }
+  .weather-day {
+    background:var(--bg3); border:1px solid var(--border);
+    border-radius:6px; padding:10px;
+    text-align:center;
+  }
+  .weather-day.today { border-color:var(--amber); }
+  .weather-dow {
+    font-family:var(--display); font-size:10px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--text-dim); margin-bottom:4px;
+  }
+  .weather-icon { font-size:22px; margin:4px 0; }
+  .weather-temp {
+    font-family:var(--mono); font-size:14px; font-weight:700;
+    color:var(--text-bright);
+  }
+  .weather-desc {
+    font-family:var(--body); font-size:9px;
+    color:var(--text-dim); margin-top:3px;
+  }
+  .weather-alert {
+    grid-column:1/-1;
+    background:rgba(231,76,60,0.1); border:1px solid var(--red);
+    border-radius:6px; padding:8px 12px;
+    font-family:var(--mono); font-size:10px; color:var(--red);
+    display:flex; align-items:center; gap:8px;
+  }
+
+  /* REVIEW STARS */
+  .review-card {
+    display:flex; align-items:center; gap:12px;
+  }
+  .review-score {
+    font-family:var(--mono); font-size:36px; font-weight:700;
+    color:var(--amber); line-height:1;
+  }
+  .review-stars { color:var(--amber); font-size:16px; }
+  .review-count {
+    font-family:var(--mono); font-size:10px;
+    color:var(--text-dim); margin-top:2px;
+  }
+  .review-platform {
+    font-family:var(--display); font-size:10px; font-weight:700;
+    letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-dim); margin-bottom:4px;
+  }
+
+  /* PUSH NOTIFICATION */
+  .push-item {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:8px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .push-item:last-child { border-bottom:none; }
+  .push-dot {
+    width:7px; height:7px; border-radius:50%;
+    flex-shrink:0; margin-top:4px;
+  }
+  .push-dot.red { background:var(--red); }
+  .push-dot.amber { background:var(--amber); }
+  .push-dot.green { background:var(--green); }
+  .push-text {
+    font-family:var(--body); font-size:12px; color:var(--text);
+    line-height:1.4;
+  }
+  .push-time {
+    font-family:var(--mono); font-size:9px;
+    color:var(--text-dim); margin-top:2px;
+  }
+
+  /* PROGRESS BAR */
+  .progress-wrap { margin-top:8px; }
+  .progress-label {
+    display:flex; justify-content:space-between;
+    font-family:var(--mono); font-size:10px; color:var(--text-dim);
+    margin-bottom:4px;
+  }
+  .progress-bar {
+    height:4px; background:var(--bg3);
+    border-radius:2px; overflow:hidden;
+  }
+  .progress-fill {
+    height:100%; border-radius:2px;
+    transition:width 1s ease;
+  }
+  .progress-fill.green { background:var(--green); }
+  .progress-fill.amber { background:var(--amber); }
+  .progress-fill.red { background:var(--red); }
+
+  /* LOCATION COMPARISON TABLE */
+  .loc-compare {
+    display:grid;
+    grid-template-columns: 140px repeat(3, 1fr);
+    gap:1px;
+    background:var(--border);
+    border:1px solid var(--border);
+    border-radius:8px; overflow:hidden;
+  }
+  .lc-cell {
+    background:var(--bg2);
+    padding:10px 14px;
+    font-family:var(--mono); font-size:11px;
+  }
+  .lc-header {
+    background:var(--bg3);
+    font-family:var(--display); font-size:11px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--text-dim); padding:10px 14px;
+  }
+  .lc-label {
+    font-family:var(--display); font-size:11px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* MARGIN BAR */
+  .margin-visual {
+    display:flex; height:6px; border-radius:3px; overflow:hidden;
+    margin-top:6px;
+  }
+  .mv-seg { height:100%; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* RESPONSIVE */
+  @media(max-width:1200px) {
+    .grid-4 { grid-template-columns:repeat(2,1fr); }
+    .grid-1-1-2 { grid-template-columns:1fr 1fr; }
+  }
+  @media(max-width:768px) {
+    .grid-3, .grid-2, .grid-1-2, .grid-2-1 { grid-template-columns:1fr; }
+    .grid-4 { grid-template-columns:1fr 1fr; }
+    main { padding:12px; }
+  }
+
+  /* BADGE */
+  .badge {
+    display:inline-block; padding:2px 8px;
+    border-radius:3px; font-family:var(--mono);
+    font-size:9px; font-weight:700; letter-spacing:0.1em;
+    text-transform:uppercase;
+  }
+  .badge-green { background:rgba(46,204,113,0.15); color:var(--green); border:1px solid var(--green-dim); }
+  .badge-amber { background:rgba(245,166,35,0.15); color:var(--amber); border:1px solid var(--amber-dim); }
+  .badge-red { background:rgba(231,76,60,0.15); color:var(--red); border:1px solid var(--red-dim); }
+  .badge-blue { background:rgba(52,152,219,0.15); color:var(--blue); border:1px solid rgba(52,152,219,0.3); }
+
+  /* MINI SPARKLINE */
+  .sparkline { width:80px; height:28px; }
+
+  /* FORECAST TABLE */
+  .scenario-row {
+    display:grid; grid-template-columns:120px 1fr 1fr 1fr 1fr;
+    gap:1px; background:var(--border);
+  }
+  .scenario-cell {
+    background:var(--bg2); padding:10px 14px;
+    font-family:var(--mono); font-size:11px;
+  }
+  .scenario-name {
+    font-family:var(--display); font-size:11px; font-weight:700;
+    color:var(--text-dim); letter-spacing:0.08em; text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark"></div>
+    <div>
+      <div class="logo-text">AOG Cockpit</div>
+      <div class="logo-sub">Management Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="weather-pill">🌧 4°C · Rain risk 80% Fri</div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="header-time" id="clock"></div>
+  </div>
+</header>
+
+<nav>
+  <button class="nav-btn active" onclick="showPage('cockpit',this)"><span class="nav-icon">⬡</span>Cockpit</button>
+  <button class="nav-btn" onclick="showPage('sales',this)"><span class="nav-icon">◈</span>Sales</button>
+  <button class="nav-btn" onclick="showPage('cogs',this)"><span class="nav-icon">◆</span>Cost of Goods</button>
+  <button class="nav-btn" onclick="showPage('staffing',this)"><span class="nav-icon">◉</span>Staffing</button>
+  <button class="nav-btn" onclick="showPage('contribution',this)"><span class="nav-icon">◫</span>Contribution</button>
+  <button class="nav-btn" onclick="showPage('accounting',this)"><span class="nav-icon">◰</span>Accounting</button>
+  <button class="nav-btn" onclick="showPage('forecast',this)"><span class="nav-icon">◳</span>Forecast</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════ COCKPIT ═══════════════ -->
+<div class="page active" id="page-cockpit">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Today's Cockpit</div>
+      <div class="page-subtitle">SAT 21 FEB 2026 · ALL LOCATIONS · WEEK 08</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <span class="badge badge-amber">⚠ RAIN ALERT FRIDAY</span>
+      <span class="badge badge-green">OPEN · 3/3 LOCATIONS</span>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">Today Revenue</div>
+      <div class="kpi-value amber">€2,847<span class="kpi-unit"></span></div>
+      <div class="kpi-delta up">▲ +12.4% vs PY</div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>vs Forecast</span><span>94%</span></div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:94%"></div></div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">Avg Receipt Value</div>
+      <div class="kpi-value">€8.40</div>
+      <div class="kpi-delta up">▲ +0.60 vs PY</div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>vs Target €8.00</span><span>105%</span></div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:100%"></div></div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">Labor Cost Ratio</div>
+      <div class="kpi-value">28.3<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta flat">→ Target 27%</div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>PES %</span><span>+1.3pp over</span></div>
+        <div class="progress-bar"><div class="progress-fill amber" style="width:72%"></div></div>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">CM1 Today (est.)</div>
+      <div class="kpi-value">€1,791</div>
+      <div class="kpi-delta up">▲ CM1 63%</div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>vs Plan CM1 61%</span><span>+2pp</span></div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:85%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECOND ROW: more KPIs -->
+  <div class="grid-4" style="margin-bottom:16px;">
+    <div class="kpi-card">
+      <div class="kpi-label">Receipts Today</div>
+      <div class="kpi-value">339</div>
+      <div class="kpi-delta up">▲ +28 vs PY</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-red"></div>
+      <div class="kpi-label">Upsell: Sides Rate</div>
+      <div class="kpi-value red">41<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta down">▼ Target 55%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Revenue / Op. Hour</div>
+      <div class="kpi-value">€142</div>
+      <div class="kpi-delta up">▲ +€18 vs Target</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">WoW Revenue</div>
+      <div class="kpi-value green">+8.7<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta up">Week 08 vs 07</div>
+    </div>
+  </div>
+
+  <!-- WEATHER + PUSH + REVIEWS -->
+  <div class="grid-1-1-2" style="margin-bottom:16px;">
+    <!-- Weather -->
+    <div class="card" style="grid-column:1/3;">
+      <div class="card-title">🌤 Weather Forecast — Impact Watch</div>
+      <div class="weather-widget">
+        <div class="weather-alert">
+          🔴 PUSH SENT: Heavy rain forecast Friday–Saturday. Staffing review recommended. Expected revenue impact: –30% to –45%.
+        </div>
+        <div class="weather-day today">
+          <div class="weather-dow">Today</div>
+          <div class="weather-icon">⛅</div>
+          <div class="weather-temp">4°</div>
+          <div class="weather-desc">Partly cloudy</div>
+        </div>
+        <div class="weather-day">
+          <div class="weather-dow">Sun</div>
+          <div class="weather-icon">🌥</div>
+          <div class="weather-temp">5°</div>
+          <div class="weather-desc">Overcast</div>
+        </div>
+        <div class="weather-day">
+          <div class="weather-dow">Mon</div>
+          <div class="weather-icon">☀️</div>
+          <div class="weather-temp">7°</div>
+          <div class="weather-desc">Sunny</div>
+        </div>
+        <div class="weather-day">
+          <div class="weather-dow">Fri</div>
+          <div class="weather-icon">🌧</div>
+          <div class="weather-temp">3°</div>
+          <div class="weather-desc">Heavy rain</div>
+        </div>
+        <div class="weather-day">
+          <div class="weather-dow">Sat</div>
+          <div class="weather-icon">🌩</div>
+          <div class="weather-temp">2°</div>
+          <div class="weather-desc">Storm</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Push Alerts -->
+    <div class="card">
+      <div class="card-title">⚡ Push Alerts</div>
+      <div class="push-item">
+        <div class="push-dot red"></div>
+        <div>
+          <div class="push-text">Sides upsell rate at Spittelau below target (41% vs 55%) for 2h straight.</div>
+          <div class="push-time">14:32 · Spittelau</div>
+        </div>
+      </div>
+      <div class="push-item">
+        <div class="push-dot amber"></div>
+        <div>
+          <div class="push-text">PES% at Pfeilgasse trending over 30% — revenue lower than forecast.</div>
+          <div class="push-time">13:10 · Pfeilgasse</div>
+        </div>
+      </div>
+      <div class="push-item">
+        <div class="push-dot green"></div>
+        <div>
+          <div class="push-text">Steinhof on track: Revenue 104% of daily forecast. CM1 above plan.</div>
+          <div class="push-time">12:00 · Steinhof</div>
+        </div>
+      </div>
+      <div class="push-item">
+        <div class="push-dot amber"></div>
+        <div>
+          <div class="push-text">Storm warning issued for Friday. Push sent to all management.</div>
+          <div class="push-time">09:00 · System</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Quick View + Reviews -->
+  <div class="grid-3" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="card-title">📍 Pfeilgasse</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="kpi-label">Revenue</div>
+          <div class="kpi-value" style="font-size:18px;">€1,124</div>
+          <div class="kpi-delta up">▲ +9%</div>
+        </div>
+        <div>
+          <div class="kpi-label">PES%</div>
+          <div class="kpi-value amber" style="font-size:18px;">30.1%</div>
+          <div class="kpi-delta flat">→ +3pp</div>
+        </div>
+        <div>
+          <div class="kpi-label">Rev/Hr</div>
+          <div class="kpi-value" style="font-size:18px;">€128</div>
+        </div>
+        <div>
+          <div class="kpi-label">Receipts</div>
+          <div class="kpi-value" style="font-size:18px;">134</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📍 Spittelau</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="kpi-label">Revenue</div>
+          <div class="kpi-value" style="font-size:18px;">€987</div>
+          <div class="kpi-delta down">▼ -2%</div>
+        </div>
+        <div>
+          <div class="kpi-label">PES%</div>
+          <div class="kpi-value green" style="font-size:18px;">25.3%</div>
+          <div class="kpi-delta up">▲ On target</div>
+        </div>
+        <div>
+          <div class="kpi-label">Rev/Hr</div>
+          <div class="kpi-value" style="font-size:18px;">€145</div>
+        </div>
+        <div>
+          <div class="kpi-label">Receipts</div>
+          <div class="kpi-value" style="font-size:18px;">118</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📍 Steinhof</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div class="kpi-label">Revenue</div>
+          <div class="kpi-value green" style="font-size:18px;">€736</div>
+          <div class="kpi-delta up">▲ +21%</div>
+        </div>
+        <div>
+          <div class="kpi-label">PES%</div>
+          <div class="kpi-value green" style="font-size:18px;">24.8%</div>
+          <div class="kpi-delta up">▲ Best today</div>
+        </div>
+        <div>
+          <div class="kpi-label">Rev/Hr</div>
+          <div class="kpi-value" style="font-size:18px;">€155</div>
+        </div>
+        <div>
+          <div class="kpi-label">Receipts</div>
+          <div class="kpi-value" style="font-size:18px;">87</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reviews Row -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">⭐ Google Reviews — Pfeilgasse</div>
+      <div class="review-card">
+        <div class="review-score">4.6</div>
+        <div>
+          <div class="review-stars">★★★★½</div>
+          <div class="review-count">312 reviews</div>
+          <div style="margin-top:8px;"><span class="badge badge-green">+2 this week</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">⭐ Google Reviews — Spittelau</div>
+      <div class="review-card">
+        <div class="review-score">4.4</div>
+        <div>
+          <div class="review-stars">★★★★</div>
+          <div class="review-count">198 reviews</div>
+          <div style="margin-top:8px;"><span class="badge badge-amber">1 negative this week</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">⭐ Google Reviews — Steinhof</div>
+      <div class="review-card">
+        <div class="review-score">4.7</div>
+        <div>
+          <div class="review-stars">★★★★★</div>
+          <div class="review-count">87 reviews</div>
+          <div style="margin-top:8px;"><span class="badge badge-green">New! +4 this week</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ SALES ═══════════════ -->
+<div class="page" id="page-sales">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Sales Analysis</div>
+      <div class="page-subtitle">REVENUE · MIX · TRENDS · WEEKDAY PATTERNS</div>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <div class="ctrl-group">
+      <button class="ctrl-btn" onclick="setCtrl(this,'period')">Day</button>
+      <button class="ctrl-btn active" onclick="setCtrl(this,'period')">Week</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'period')">Month</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'period')">YTD</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'period')">Custom</button>
+    </div>
+    <div class="ctrl-group">
+      <button class="ctrl-btn active" onclick="setCtrl(this,'scale')">Hours</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'scale')">3h Slots</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'scale')">Days</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'scale')">Weekdays</button>
+    </div>
+    <div class="ctrl-group">
+      <button class="ctrl-btn active" onclick="setCtrl(this,'calc')">Sum</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'calc')">Avg</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'calc')">Median</button>
+    </div>
+    <div class="ctrl-group">
+      <button class="ctrl-btn active" onclick="setCtrl(this,'vat')">Gross</button>
+      <button class="ctrl-btn" onclick="setCtrl(this,'vat')">Net</button>
+    </div>
+    <select class="ctrl-select">
+      <option>vs Prior Year</option>
+      <option>vs Prior Month</option>
+      <option>vs Prior Week</option>
+      <option>vs Prior Day</option>
+    </select>
+    <select class="ctrl-select">
+      <option>All Locations</option>
+      <option>Pfeilgasse</option>
+      <option>Spittelau</option>
+      <option>Steinhof</option>
+    </select>
+  </div>
+
+  <!-- Top KPIs -->
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="kpi-label">Week Revenue</div>
+      <div class="kpi-value amber">€18,420</div>
+      <div class="kpi-delta up">▲ +8.7% vs PY</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Receipts</div>
+      <div class="kpi-value">2,191</div>
+      <div class="kpi-delta up">▲ +187 vs PY</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Receipt</div>
+      <div class="kpi-value">€8.40</div>
+      <div class="kpi-delta up">▲ +7.7% vs PY</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Units Sold</div>
+      <div class="kpi-value">4,830</div>
+      <div class="kpi-delta up">▲ +6.2%</div>
+    </div>
+  </div>
+
+  <!-- Revenue Chart -->
+  <div class="grid-2-1" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="card-title">Revenue by Hour — This Week vs PY</div>
+      <div class="chart-wrap">
+        <canvas id="revenueHourly"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Category Split</div>
+      <div class="chart-wrap" style="display:flex;align-items:center;justify-content:center;min-height:200px;">
+        <canvas id="categorySplit" style="max-height:200px;max-width:200px;"></canvas>
+      </div>
+      <div style="margin-top:8px;">
+        <table class="data-table">
+          <tr><td>🥩 Food</td><td class="td-amber">€10,820</td><td class="td-green">58.7%</td></tr>
+          <tr><td>🥤 Beverages</td><td class="td-amber">€5,390</td><td class="td-dim">29.3%</td></tr>
+          <tr><td>🔄 Deposit</td><td class="td-amber">€840</td><td class="td-dim">4.6%</td></tr>
+          <tr><td>📦 Non-food</td><td class="td-amber">€1,370</td><td class="td-dim">7.4%</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekday + Upsell -->
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="card-title">Revenue by Weekday (4-week avg)</div>
+      <div class="chart-wrap">
+        <canvas id="weekdayRevenue"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Upsell Rates — Week 08</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>KPI</th><th>Actual</th><th>Target</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Sides w/ Sausage Dish</td>
+            <td class="td-red">41%</td>
+            <td class="td-dim">55%</td>
+            <td><span class="badge badge-red">−14pp</span></td>
+          </tr>
+          <tr>
+            <td>Papas w/ Sausage Dish</td>
+            <td class="td-amber">48%</td>
+            <td class="td-dim">55%</td>
+            <td><span class="badge badge-amber">−7pp</span></td>
+          </tr>
+          <tr>
+            <td>Beverage w/ Food (Lunch)</td>
+            <td class="td-green">62%</td>
+            <td class="td-dim">60%</td>
+            <td><span class="badge badge-green">+2pp</span></td>
+          </tr>
+          <tr>
+            <td>Food-only receipts</td>
+            <td class="td-dim">44%</td>
+            <td class="td-dim">—</td>
+            <td><span class="badge badge-blue">INFO</span></td>
+          </tr>
+          <tr>
+            <td>Beverage-only receipts</td>
+            <td class="td-dim">18%</td>
+            <td class="td-dim">—</td>
+            <td><span class="badge badge-blue">INFO</span></td>
+          </tr>
+          <tr>
+            <td>Food+Beverage receipts</td>
+            <td class="td-green">38%</td>
+            <td class="td-dim">—</td>
+            <td><span class="badge badge-blue">INFO</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Product breakdown -->
+  <div class="card">
+    <div class="card-title">Top Products by Revenue — Week 08</div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Product</th><th>Category</th><th>Units</th><th>Revenue</th><th>Mix %</th><th>vs PY</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Classic Käsekrainer</td><td class="td-dim">Sausage</td><td>842</td><td class="td-amber">€3,200</td><td>17.4%</td><td class="td-green">▲+12%</td></tr>
+        <tr><td>Dirty Fries (RS)</td><td class="td-dim">Papas</td><td>610</td><td class="td-amber">€2,745</td><td>14.9%</td><td class="td-green">▲+18%</td></tr>
+        <tr><td>Bosna</td><td class="td-dim">Sausage</td><td>523</td><td class="td-amber">€1,988</td><td>10.8%</td><td class="td-dim">→+2%</td></tr>
+        <tr><td>Cola 0.33</td><td class="td-dim">Beverage</td><td>1,203</td><td class="td-amber">€1,924</td><td>10.4%</td><td class="td-dim">→+4%</td></tr>
+        <tr><td>Hot Dog</td><td class="td-dim">Sausage</td><td>489</td><td class="td-amber">€1,467</td><td>8.0%</td><td class="td-red">▼-6%</td></tr>
+        <tr><td>Rohscheiben</td><td class="td-dim">Sides</td><td>720</td><td class="td-amber">€1,080</td><td>5.9%</td><td class="td-red">▼-3%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ COST OF GOODS ═══════════════ -->
+<div class="page" id="page-cogs">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Cost of Goods & CM1</div>
+      <div class="page-subtitle">WARENEINSATZ · CONTRIBUTION MARGIN · INVENTORY</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">CoG Total (Feb)</div>
+      <div class="kpi-value amber">€6,840</div>
+      <div class="kpi-delta up">▲ On plan</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">CoG Ratio – Food</div>
+      <div class="kpi-value">28.4<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta up">▲ Target 30%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">CoG Ratio – Drinks</div>
+      <div class="kpi-value">22.1<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta flat">→ Target 22%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">CM1 (Feb est.)</div>
+      <div class="kpi-value green">€11,240</div>
+      <div class="kpi-delta up">▲ CM1 62.2%</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="card-title">CoG Monthly Trend — Actual vs Plan</div>
+      <div class="chart-wrap">
+        <canvas id="cogTrend"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">CoG Split by Category</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Category</th><th>Actual</th><th>Plan</th><th>CoG %</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Food + Packaging + Logistics</td>
+            <td class="td-amber">€4,280</td>
+            <td class="td-dim">€4,500</td>
+            <td>28.4%</td>
+            <td><span class="badge badge-green">Under plan</span></td>
+          </tr>
+          <tr>
+            <td>Beverages + Logistics (ex. deposit)</td>
+            <td class="td-amber">€1,890</td>
+            <td class="td-dim">€1,900</td>
+            <td>22.1%</td>
+            <td><span class="badge badge-green">On plan</span></td>
+          </tr>
+          <tr>
+            <td>Non-food (cleaning etc.)</td>
+            <td class="td-amber">€670</td>
+            <td class="td-dim">€600</td>
+            <td>—</td>
+            <td><span class="badge badge-amber">+12% over</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="section-gap"></div>
+      <div class="card-title">Inventory Variance</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Month</th><th>Counted</th><th>Expected</th><th>Variance</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>January</td><td>€3,210</td><td>€3,180</td><td class="td-amber">+€30</td></tr>
+          <tr><td>December</td><td>€3,440</td><td>€3,520</td><td class="td-red">-€80</td></tr>
+          <tr><td>November</td><td>€2,980</td><td>€2,990</td><td class="td-green">-€10</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">CM1 Bridge — Month to Date</div>
+    <div class="chart-wrap">
+      <canvas id="cm1Bridge"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ STAFFING ═══════════════ -->
+<div class="page" id="page-staffing">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Staffing & Productivity</div>
+      <div class="page-subtitle">HOURS · COSTS · EFFICIENCY · SICK LEAVE</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">Hours Worked (Week)</div>
+      <div class="kpi-value">142<span class="kpi-unit">h</span></div>
+      <div class="kpi-delta flat">→ Plan: 138h</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">Labor Cost (Week)</div>
+      <div class="kpi-value">€5,218</div>
+      <div class="kpi-delta flat">→ +€180 vs plan</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">PES Ratio (Week)</div>
+      <div class="kpi-value">28.3<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta down">▼ Target 27%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">Rev / Op. Hour</div>
+      <div class="kpi-value green">€142</div>
+      <div class="kpi-delta up">▲ Target €124</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="card-title">Hours Planned vs Worked — This Week</div>
+      <div class="chart-wrap">
+        <canvas id="hoursChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Productivity: Revenue per Op. Hour by Day</div>
+      <div class="chart-wrap">
+        <canvas id="productivityChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">PES% by Location — Week 08</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Location</th><th>Hours</th><th>Labor Cost</th><th>Revenue</th><th>PES%</th><th>Target</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Pfeilgasse</td>
+            <td>58h</td>
+            <td>€2,102</td>
+            <td class="td-amber">€6,980</td>
+            <td class="td-amber">30.1%</td>
+            <td><span class="badge badge-amber">+3.1pp</span></td>
+          </tr>
+          <tr>
+            <td>Spittelau</td>
+            <td>52h</td>
+            <td>€1,884</td>
+            <td class="td-amber">€7,420</td>
+            <td class="td-green">25.4%</td>
+            <td><span class="badge badge-green">−1.6pp</span></td>
+          </tr>
+          <tr>
+            <td>Steinhof</td>
+            <td>32h</td>
+            <td>€1,160</td>
+            <td class="td-amber">€4,020</td>
+            <td class="td-green">28.9%</td>
+            <td><span class="badge badge-amber">+1.9pp</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="section-gap"></div>
+      <div class="card-title">Sick Leave — Q1 2026</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Employee</th><th>Location</th><th>Missed Shifts</th><th>KS%</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>All staff avg.</td><td class="td-dim">All</td><td>3.2</td><td class="td-green">4.1%</td></tr>
+          <tr><td>Pfeilgasse team</td><td class="td-dim">Pfeilgasse</td><td>4.0</td><td class="td-amber">5.2%</td></tr>
+          <tr><td>Spittelau team</td><td class="td-dim">Spittelau</td><td>2.1</td><td class="td-green">2.7%</td></tr>
+          <tr><td>Steinhof team</td><td class="td-dim">Steinhof</td><td>3.5</td><td class="td-amber">4.5%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Staff Satisfaction Survey — After Each Shift (Pilot)</div>
+      <div style="margin-bottom:12px;">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:6px;">OVER/UNDERLOAD RATINGS (LAST 4 WEEKS)</div>
+        <div class="progress-wrap">
+          <div class="progress-label"><span>Overloaded</span><span>18%</span></div>
+          <div class="progress-bar"><div class="progress-fill red" style="width:18%"></div></div>
+        </div>
+        <div class="progress-wrap" style="margin-top:8px;">
+          <div class="progress-label"><span>Well loaded</span><span>64%</span></div>
+          <div class="progress-bar"><div class="progress-fill green" style="width:64%"></div></div>
+        </div>
+        <div class="progress-wrap" style="margin-top:8px;">
+          <div class="progress-label"><span>Underloaded</span><span>18%</span></div>
+          <div class="progress-bar"><div class="progress-fill amber" style="width:18%"></div></div>
+        </div>
+      </div>
+      <div style="font-family:var(--body);font-size:11px;color:var(--text-dim);padding:8px;background:var(--bg3);border-radius:4px;border-left:2px solid var(--amber);">
+        Note: Testing whether total revenue or food-only revenue better explains workload. Qualitative surveying ongoing. Results to be used for shift planning calibration.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CONTRIBUTION MARGIN ═══════════════ -->
+<div class="page" id="page-contribution">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Contribution Margin</div>
+      <div class="page-subtitle">DB1 · DB2 · EBITDA · LOCATION P&L</div>
+    </div>
+  </div>
+
+  <div class="loc-tabs">
+    <button class="loc-tab active" onclick="setLoc(this)">All Locations</button>
+    <button class="loc-tab" onclick="setLoc(this)">Pfeilgasse</button>
+    <button class="loc-tab" onclick="setLoc(this)">Spittelau</button>
+    <button class="loc-tab" onclick="setLoc(this)">Steinhof</button>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="kpi-label">Revenue (MTD)</div>
+      <div class="kpi-value amber">€18,420</div>
+      <div class="kpi-delta up">▲ +8.7%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">CM1 (MTD)</div>
+      <div class="kpi-value green">€11,460</div>
+      <div class="kpi-delta up">▲ CM1 62.2%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">CM2 (MTD)</div>
+      <div class="kpi-value">€6,242</div>
+      <div class="kpi-delta flat">→ CM2 33.9%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">EBITDA (MTD est.)</div>
+      <div class="kpi-value">€3,810</div>
+      <div class="kpi-delta flat">→ Margin 20.7%</div>
+    </div>
+  </div>
+
+  <!-- P&L Table -->
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-title">P&L Waterfall — February MTD (All Locations)</div>
+    <div class="chart-wrap tall">
+      <canvas id="plWaterfall"></canvas>
+    </div>
+  </div>
+
+  <!-- Location Comparison -->
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-title">Location Comparison — February MTD</div>
+    <div class="loc-compare">
+      <div class="lc-header">KPI</div>
+      <div class="lc-header" style="color:var(--amber);">Pfeilgasse</div>
+      <div class="lc-header" style="color:var(--blue);">Spittelau</div>
+      <div class="lc-header" style="color:var(--green);">Steinhof</div>
+
+      <div class="lc-cell lc-label">Revenue</div>
+      <div class="lc-cell td-amber">€6,980</div>
+      <div class="lc-cell td-amber">€7,420</div>
+      <div class="lc-cell td-amber">€4,020</div>
+
+      <div class="lc-cell lc-label">Rev / Open Hr</div>
+      <div class="lc-cell">€128</div>
+      <div class="lc-cell">€145</div>
+      <div class="lc-cell td-green">€155</div>
+
+      <div class="lc-cell lc-label">CoG</div>
+      <div class="lc-cell">€2,660</div>
+      <div class="lc-cell">€2,824</div>
+      <div class="lc-cell">€1,528</div>
+
+      <div class="lc-cell lc-label">CM1</div>
+      <div class="lc-cell">€4,320</div>
+      <div class="lc-cell">€4,596</div>
+      <div class="lc-cell td-green">€2,492</div>
+
+      <div class="lc-cell lc-label">CM1 %</div>
+      <div class="lc-cell">61.9%</div>
+      <div class="lc-cell">61.9%</div>
+      <div class="lc-cell td-green">62.0%</div>
+
+      <div class="lc-cell lc-label">Labor Cost</div>
+      <div class="lc-cell td-red">€2,102</div>
+      <div class="lc-cell td-green">€1,884</div>
+      <div class="lc-cell">€1,160</div>
+
+      <div class="lc-cell lc-label">PES%</div>
+      <div class="lc-cell td-red">30.1%</div>
+      <div class="lc-cell td-green">25.4%</div>
+      <div class="lc-cell td-amber">28.9%</div>
+
+      <div class="lc-cell lc-label">CM2</div>
+      <div class="lc-cell">€2,218</div>
+      <div class="lc-cell td-green">€2,712</div>
+      <div class="lc-cell">€1,332</div>
+
+      <div class="lc-cell lc-label">CM2 %</div>
+      <div class="lc-cell">31.8%</div>
+      <div class="lc-cell td-green">36.6%</div>
+      <div class="lc-cell">33.1%</div>
+    </div>
+    <div style="margin-top:10px;padding:8px;background:var(--bg3);border-radius:4px;font-family:var(--body);font-size:11px;color:var(--text-dim);">
+      ⚠ Overhead allocation pending: Handyman Oskar, Chef Alex, MD Mike salary to be split across locations. Currently excluded from CM2.
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">CM1% Monthly Trend — All Locations</div>
+      <div class="chart-wrap">
+        <canvas id="cm1Trend"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cost Structure Breakdown (MTD)</div>
+      <div class="chart-wrap" style="display:flex;align-items:center;justify-content:center;min-height:200px;">
+        <canvas id="costPie" style="max-height:200px;max-width:200px;"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ ACCOUNTING ═══════════════ -->
+<div class="page" id="page-accounting">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Accounting</div>
+      <div class="page-subtitle">CASH VARIANCE · OPEN ITEMS · MONTHLY CLOSE</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="traffic-light tl-green"></div>
+      <div class="kpi-label">Cash Balance (Today)</div>
+      <div class="kpi-value green">€12,840</div>
+      <div class="kpi-delta up">▲ On plan</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-amber"></div>
+      <div class="kpi-label">Cash Variance (MTD)</div>
+      <div class="kpi-value amber">−€210</div>
+      <div class="kpi-delta flat">→ Investigate</div>
+    </div>
+    <div class="kpi-card">
+      <div class="traffic-light tl-red"></div>
+      <div class="kpi-label">Open Invoices</div>
+      <div class="kpi-value red">€4,320</div>
+      <div class="kpi-delta down">▼ 3 overdue</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Accounts Payable</div>
+      <div class="kpi-value">€2,180</div>
+      <div class="kpi-delta flat">→ Due in 14 days</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="card-title">Cash Flow — February (Daily)</div>
+      <div class="chart-wrap">
+        <canvas id="cashFlow"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Open Items</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Item</th><th>Amount</th><th>Due Date</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Lieferant Fleisch GmbH</td>
+            <td class="td-red">€1,840</td>
+            <td class="td-red">14 Feb</td>
+            <td><span class="badge badge-red">Overdue</span></td>
+          </tr>
+          <tr>
+            <td>Getränke Handel AG</td>
+            <td class="td-red">€920</td>
+            <td class="td-red">18 Feb</td>
+            <td><span class="badge badge-red">Overdue</span></td>
+          </tr>
+          <tr>
+            <td>Reinigungsfirma Wien</td>
+            <td class="td-amber">€560</td>
+            <td class="td-amber">28 Feb</td>
+            <td><span class="badge badge-amber">Due soon</span></td>
+          </tr>
+          <tr>
+            <td>Miete Pfeilgasse (Feb)</td>
+            <td class="td-amber">€1,000</td>
+            <td class="td-amber">28 Feb</td>
+            <td><span class="badge badge-amber">Due soon</span></td>
+          </tr>
+          <tr>
+            <td>Buchhaltung Honorar</td>
+            <td class="td-dim">€480</td>
+            <td class="td-dim">10 Mar</td>
+            <td><span class="badge badge-green">On time</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Cash Variance Breakdown — Reconciliation</div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Date</th><th>Location</th><th>POS Total</th><th>Counted</th><th>Variance</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>20 Feb</td><td>Pfeilgasse</td><td>€842</td><td>€838</td><td class="td-red">−€4</td><td class="td-dim">Under investigation</td></tr>
+        <tr><td>20 Feb</td><td>Spittelau</td><td>€911</td><td>€920</td><td class="td-green">+€9</td><td class="td-dim">Rounding</td></tr>
+        <tr><td>19 Feb</td><td>Steinhof</td><td>€680</td><td>€465</td><td class="td-red">−€215</td><td class="td-red">⚠ Significant – check</td></tr>
+        <tr><td>19 Feb</td><td>Pfeilgasse</td><td>€795</td><td>€800</td><td class="td-green">+€5</td><td class="td-dim">OK</td></tr>
+        <tr><td>18 Feb</td><td>Spittelau</td><td>€876</td><td>€876</td><td class="td-green">€0</td><td class="td-dim">Exact</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ FORECAST ═══════════════ -->
+<div class="page" id="page-forecast">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Forecast & Planning</div>
+      <div class="page-subtitle">SCENARIOS · WEATHER IMPACT · 12-WEEK OUTLOOK</div>
+    </div>
+  </div>
+
+  <div class="grid-4" style="margin-bottom:12px;">
+    <div class="kpi-card">
+      <div class="kpi-label">Base Forecast (Mar)</div>
+      <div class="kpi-value amber">€74,200</div>
+      <div class="kpi-delta up">▲ +6% vs Feb plan</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Bear Scenario (Mar)</div>
+      <div class="kpi-value red">€58,000</div>
+      <div class="kpi-delta down">▼ Weather + sick</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Bull Scenario (Mar)</div>
+      <div class="kpi-value green">€84,000</div>
+      <div class="kpi-delta up">▲ Good weather</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Feb Forecast Accuracy</div>
+      <div class="kpi-value">94<span class="kpi-unit">%</span></div>
+      <div class="kpi-delta up">▲ Good model</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-title">12-Week Revenue Forecast — Scenarios</div>
+    <div class="chart-wrap tall">
+      <canvas id="forecastChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Scenario Table -->
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-title">Scenario Analysis — March 2026</div>
+    <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+      <div class="scenario-row">
+        <div class="scenario-cell" style="background:var(--bg3);"><span class="scenario-name">Scenario</span></div>
+        <div class="scenario-cell" style="background:var(--bg3);font-family:var(--display);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);">Revenue</div>
+        <div class="scenario-cell" style="background:var(--bg3);font-family:var(--display);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);">CM1</div>
+        <div class="scenario-cell" style="background:var(--bg3);font-family:var(--display);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);">CM2</div>
+        <div class="scenario-cell" style="background:var(--bg3);font-family:var(--display);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);">EBITDA</div>
+      </div>
+      <div class="scenario-row">
+        <div class="scenario-cell"><span class="badge badge-green">Base</span></div>
+        <div class="scenario-cell">€74,200</div>
+        <div class="scenario-cell">€46,100 (62.1%)</div>
+        <div class="scenario-cell">€25,100 (33.8%)</div>
+        <div class="scenario-cell td-green">€15,600 (21%)</div>
+      </div>
+      <div class="scenario-row">
+        <div class="scenario-cell"><span class="badge badge-amber">Rain –20%</span></div>
+        <div class="scenario-cell td-amber">€59,360</div>
+        <div class="scenario-cell">€36,880</div>
+        <div class="scenario-cell">€20,080</div>
+        <div class="scenario-cell td-amber">€12,480 (21%)</div>
+      </div>
+      <div class="scenario-row">
+        <div class="scenario-cell"><span class="badge badge-red">Storm –40%</span></div>
+        <div class="scenario-cell td-red">€44,520</div>
+        <div class="scenario-cell">€27,660</div>
+        <div class="scenario-cell">€15,060</div>
+        <div class="scenario-cell td-red">€9,360 (21%)</div>
+      </div>
+      <div class="scenario-row">
+        <div class="scenario-cell"><span class="badge badge-blue">Bull +13%</span></div>
+        <div class="scenario-cell td-green">€84,000</div>
+        <div class="scenario-cell td-green">€52,200</div>
+        <div class="scenario-cell td-green">€28,400</div>
+        <div class="scenario-cell td-green">€17,600 (21%)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Weather-Revenue Correlation (Last 52 Weeks)</div>
+    <div class="chart-wrap">
+      <canvas id="weatherCorr"></canvas>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ─── CLOCK ───
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock,1000); updateClock();
+
+// ─── NAVIGATION ───
+function showPage(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  initCharts(id);
+}
+
+function setCtrl(el, group){
+  el.closest('.ctrl-group').querySelectorAll('.ctrl-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function setLoc(el){
+  el.closest('.loc-tabs').querySelectorAll('.loc-tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ─── CHART DEFAULTS ───
+const COLORS = {
+  amber:'rgba(245,166,35,',
+  green:'rgba(46,204,113,',
+  red:'rgba(231,76,60,',
+  blue:'rgba(52,152,219,',
+  purple:'rgba(155,89,182,',
+  teal:'rgba(26,188,156,',
+  dim:'rgba(96,104,128,',
+};
+
+function hex(c,a){return c+''+a+')';}
+
+Chart.defaults.color = '#606880';
+Chart.defaults.borderColor = '#252a35';
+Chart.defaults.font.family = "'Space Mono', monospace";
+Chart.defaults.font.size = 10;
+
+const chartInstances = {};
+function destroyChart(id){ if(chartInstances[id]){ chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function makeChart(id, config){
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  chartInstances[id] = new Chart(ctx, config);
+}
+
+// ─── INIT CHARTS ───
+const initialised = {};
+function initCharts(page){
+  if(initialised[page]) return;
+  initialised[page] = true;
+
+  if(page==='cockpit'){
+    // no heavy charts on cockpit
+  }
+
+  if(page==='sales'){
+    // Revenue Hourly
+    const hours = ['10','11','12','13','14','15','16','17','18','19','20','21'];
+    makeChart('revenueHourly',{type:'bar',data:{
+      labels:hours,
+      datasets:[
+        {label:'This Week',data:[120,310,580,620,540,480,510,490,430,380,290,180],
+          backgroundColor:hex(COLORS.amber,'0.7'),borderColor:hex(COLORS.amber,'1'),borderWidth:1,borderRadius:3},
+        {label:'Prior Year',data:[100,280,520,590,500,440,470,450,400,350,260,160],
+          type:'line',borderColor:hex(COLORS.dim,'0.8'),borderWidth:1.5,pointRadius:0,fill:false}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v}},x:{grid:{display:false}}}}});
+
+    // Category Pie
+    makeChart('categorySplit',{type:'doughnut',data:{
+      labels:['Food','Beverages','Deposit','Non-food'],
+      datasets:[{data:[58.7,29.3,4.6,7.4],
+        backgroundColor:[hex(COLORS.amber,'0.8'),hex(COLORS.blue,'0.8'),hex(COLORS.teal,'0.8'),hex(COLORS.dim,'0.8')],
+        borderColor:'#111318',borderWidth:2}]
+    },options:{responsive:true,maintainAspectRatio:true,cutout:'68%',
+      plugins:{legend:{display:false}}}});
+
+    // Weekday Revenue
+    makeChart('weekdayRevenue',{type:'bar',data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[
+        {label:'Avg Revenue',data:[2100,2300,2400,2600,3100,3800,3200],
+          backgroundColor:hours.map((_,i)=>i<=3?hex(COLORS.dim,'0.6'):i===4?hex(COLORS.amber,'0.9'):hex(COLORS.amber,'0.7')),
+          borderRadius:4},
+        {label:'Prior Year Avg',data:[1900,2100,2200,2400,2900,3500,2900],
+          type:'line',borderColor:hex(COLORS.green,'0.7'),borderWidth:1.5,pointRadius:3,fill:false}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v}},x:{grid:{display:false}}}}});
+  }
+
+  if(page==='cogs'){
+    // CoG Trend
+    const months=['Sep','Oct','Nov','Dec','Jan','Feb'];
+    makeChart('cogTrend',{type:'line',data:{
+      labels:months,
+      datasets:[
+        {label:'CoG Actual',data:[5800,6100,5900,6400,6600,6840],
+          borderColor:hex(COLORS.amber,'1'),backgroundColor:hex(COLORS.amber,'0.1'),fill:true,tension:0.3,pointRadius:4},
+        {label:'CoG Plan',data:[6000,6000,6100,6200,6500,6900],
+          borderColor:hex(COLORS.dim,'0.9'),borderDash:[4,4],tension:0.3,pointRadius:0,fill:false},
+        {label:'CM1',data:[10200,10800,10400,11200,11800,11460],
+          borderColor:hex(COLORS.green,'1'),tension:0.3,pointRadius:4,fill:false,yAxisID:'y2'}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:true,position:'top'}},
+      scales:{
+        y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v.toLocaleString()}},
+        y2:{position:'right',ticks:{callback:v=>'€'+v.toLocaleString()},grid:{display:false}},
+        x:{grid:{display:false}}
+      }}});
+
+    // CM1 Bridge (bar waterfall simulation)
+    makeChart('cm1Bridge',{type:'bar',data:{
+      labels:['Revenue','- Food CoG','- Drink CoG','- Non-food','= CM1','- Labor','= CM2','- Overheads','= EBITDA'],
+      datasets:[{
+        data:[18420,-4280,-1890,-670,11580,-5218,6362,-2552,3810],
+        backgroundColor:d=>{
+          const vals=[18420,-4280,-1890,-670,11580,-5218,6362,-2552,3810];
+          return vals.map(v=>v>0?hex(COLORS.amber,'0.75'):hex(COLORS.red,'0.65'));
+        },
+        borderRadius:3
+      }]
+    },options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+Math.abs(v).toLocaleString()}},x:{grid:{display:false}}}}});
+  }
+
+  if(page==='staffing'){
+    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    makeChart('hoursChart',{type:'bar',data:{
+      labels:days,
+      datasets:[
+        {label:'Planned',data:[18,20,20,20,22,28,10],backgroundColor:hex(COLORS.dim,'0.5'),borderRadius:3},
+        {label:'Worked',data:[19,21,19,22,24,27,10],backgroundColor:hex(COLORS.amber,'0.75'),borderRadius:3}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},stacked:false},x:{grid:{display:false}}}}});
+
+    makeChart('productivityChart',{type:'line',data:{
+      labels:days,
+      datasets:[
+        {label:'Rev/Op Hr (€)',data:[118,132,128,138,152,165,142],
+          borderColor:hex(COLORS.green,'1'),backgroundColor:hex(COLORS.green,'0.1'),fill:true,tension:0.3,pointRadius:4},
+        {label:'Target (€)',data:[124,124,124,124,124,124,124],
+          borderColor:hex(COLORS.amber,'0.7'),borderDash:[4,4],pointRadius:0,fill:false}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v}},x:{grid:{display:false}}}}});
+  }
+
+  if(page==='contribution'){
+    const months=['Oct','Nov','Dec','Jan','Feb'];
+    makeChart('cm1Trend',{type:'line',data:{
+      labels:months,
+      datasets:[
+        {label:'Pfeilgasse CM1%',data:[60.2,61.1,59.8,62.0,61.9],borderColor:hex(COLORS.amber,'1'),tension:0.3,pointRadius:4,fill:false},
+        {label:'Spittelau CM1%',data:[62.1,61.8,63.0,62.5,61.9],borderColor:hex(COLORS.blue,'1'),tension:0.3,pointRadius:4,fill:false},
+        {label:'Steinhof CM1%',data:[63.0,62.4,64.1,63.8,62.0],borderColor:hex(COLORS.green,'1'),tension:0.3,pointRadius:4,fill:false},
+        {label:'Target',data:[61,61,61,61,61],borderColor:hex(COLORS.dim,'0.8'),borderDash:[4,4],pointRadius:0,fill:false}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{min:58,max:66,ticks:{callback:v=>v+'%'},grid:{color:'rgba(37,42,53,1)'}},x:{grid:{display:false}}}}});
+
+    makeChart('costPie',{type:'doughnut',data:{
+      labels:['CoG Food','CoG Drinks','Labor','Rent','Overheads','Other'],
+      datasets:[{data:[23.2,10.3,28.3,5.4,6.8,4.3],
+        backgroundColor:[hex(COLORS.amber,'0.8'),hex(COLORS.blue,'0.8'),hex(COLORS.red,'0.7'),hex(COLORS.purple,'0.7'),hex(COLORS.teal,'0.7'),hex(COLORS.dim,'0.6')],
+        borderColor:'#111318',borderWidth:2}]
+    },options:{responsive:true,maintainAspectRatio:true,cutout:'65%',
+      plugins:{legend:{display:true,position:'right',labels:{boxWidth:10,font:{size:9}}}}}});
+
+    makeChart('plWaterfall',{type:'bar',data:{
+      labels:['Revenue','CoG Food','CoG Drinks','CoG Other','CM1','Labor','CM2','Rent & Misc','MD Salary','EBITDA'],
+      datasets:[{
+        data:[18420,4280,1890,670,11580,5218,6362,1540,1012,3810],
+        backgroundColor:[
+          hex(COLORS.green,'0.8'),hex(COLORS.red,'0.65'),hex(COLORS.red,'0.65'),hex(COLORS.red,'0.65'),
+          hex(COLORS.amber,'0.8'),hex(COLORS.red,'0.65'),hex(COLORS.amber,'0.8'),
+          hex(COLORS.red,'0.65'),hex(COLORS.red,'0.65'),hex(COLORS.green,'0.8')
+        ],borderRadius:3
+      }]
+    },options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v.toLocaleString()}},y:{grid:{display:false}}}}});
+  }
+
+  if(page==='accounting'){
+    const days2=Array.from({length:21},(_,i)=>i+1);
+    makeChart('cashFlow',{type:'line',data:{
+      labels:days2,
+      datasets:[
+        {label:'Running Balance',data:[8200,9100,8800,10200,9800,11000,10600,12100,11800,13200,12800,13600,12900,14200,13800,14600,13200,13900,12840,null,null],
+          borderColor:hex(COLORS.green,'1'),backgroundColor:hex(COLORS.green,'0.05'),fill:true,tension:0.3,pointRadius:2},
+        {label:'Plan',data:[8000,8800,9200,10000,10400,11200,11600,12400,12800,13600,14000,14800,15200,16000,16400,17200,17600,18400,18800,null,null],
+          borderColor:hex(COLORS.dim,'0.7'),borderDash:[3,3],pointRadius:0,fill:false}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v.toLocaleString()}},x:{grid:{display:false}}}}});
+  }
+
+  if(page==='forecast'){
+    const weeks=Array.from({length:12},(_,i)=>'Wk '+(9+i));
+    const base=[74200,71000,76000,80000,84000,78000,82000,88000,85000,90000,88000,92000];
+    const bear=base.map(v=>Math.round(v*0.78));
+    const bull=base.map(v=>Math.round(v*1.13));
+
+    makeChart('forecastChart',{type:'line',data:{
+      labels:weeks,
+      datasets:[
+        {label:'Bull Scenario',data:bull,borderColor:hex(COLORS.green,'0.8'),backgroundColor:hex(COLORS.green,'0.06'),fill:'+1',tension:0.3,pointRadius:3,borderWidth:1.5},
+        {label:'Base Forecast',data:base,borderColor:hex(COLORS.amber,'1'),backgroundColor:hex(COLORS.amber,'0.1'),fill:false,tension:0.3,pointRadius:4,borderWidth:2},
+        {label:'Bear Scenario',data:bear,borderColor:hex(COLORS.red,'0.8'),backgroundColor:hex(COLORS.red,'0.06'),fill:false,tension:0.3,pointRadius:3,borderWidth:1.5}
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top'}},
+      scales:{y:{grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v.toLocaleString()}},x:{grid:{display:false}}}}});
+
+    // Weather correlation scatter
+    const scatter=[];
+    for(let i=0;i<52;i++){
+      const temp=Math.random()*25-5;
+      const sunny=temp>10?0.9:temp>5?0.7:temp>0?0.5:0.3;
+      scatter.push({x:Math.round(temp*10)/10, y:Math.round((1500+sunny*3000+Math.random()*800)*10)/10});
+    }
+    makeChart('weatherCorr',{type:'scatter',data:{
+      datasets:[{label:'Weekly Revenue vs Temp',data:scatter,
+        backgroundColor:hex(COLORS.amber,'0.5'),pointRadius:5,pointHoverRadius:7}]
+    },options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:true,position:'top'}},
+      scales:{
+        x:{title:{display:true,text:'Temperature (°C)',color:'#606880'},grid:{color:'rgba(37,42,53,1)'}},
+        y:{title:{display:true,text:'Weekly Revenue (€)',color:'#606880'},grid:{color:'rgba(37,42,53,1)'},ticks:{callback:v=>'€'+v}}
+      }}});
+  }
+}
+
+// Init cockpit on load
+initialised['cockpit'] = true;
+</script>
+</body>
+</html>
